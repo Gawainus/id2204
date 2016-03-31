@@ -102,6 +102,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named queens
+
+# Build rule for target.
+queens: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 queens
+.PHONY : queens
+
+# fast build rule for target.
+queens/fast:
+	$(MAKE) -f CMakeFiles/queens.dir/build.make CMakeFiles/queens.dir/build
+.PHONY : queens/fast
+
+#=============================================================================
 # Target rules for targets named send_more_money
 
 # Build rule for target.
@@ -126,6 +139,30 @@ sudoku: cmake_check_build_system
 sudoku/fast:
 	$(MAKE) -f CMakeFiles/sudoku.dir/build.make CMakeFiles/sudoku.dir/build
 .PHONY : sudoku/fast
+
+queens.o: queens.cpp.o
+.PHONY : queens.o
+
+# target to build an object file
+queens.cpp.o:
+	$(MAKE) -f CMakeFiles/queens.dir/build.make CMakeFiles/queens.dir/queens.cpp.o
+.PHONY : queens.cpp.o
+
+queens.i: queens.cpp.i
+.PHONY : queens.i
+
+# target to preprocess a source file
+queens.cpp.i:
+	$(MAKE) -f CMakeFiles/queens.dir/build.make CMakeFiles/queens.dir/queens.cpp.i
+.PHONY : queens.cpp.i
+
+queens.s: queens.cpp.s
+.PHONY : queens.s
+
+# target to generate assembly for a file
+queens.cpp.s:
+	$(MAKE) -f CMakeFiles/queens.dir/build.make CMakeFiles/queens.dir/queens.cpp.s
+.PHONY : queens.cpp.s
 
 send-more-money.o: send-more-money.cpp.o
 .PHONY : send-more-money.o
@@ -184,7 +221,11 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... sudoku"
+	@echo "... queens"
 	@echo "... send_more_money"
+	@echo "... queens.o"
+	@echo "... queens.i"
+	@echo "... queens.s"
 	@echo "... send-more-money.o"
 	@echo "... send-more-money.i"
 	@echo "... send-more-money.s"
