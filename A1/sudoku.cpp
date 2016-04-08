@@ -2,7 +2,16 @@
  * id2204 A1
  * Author: Yumen & Marion
  *
+ * Based on Gecode/examples/sudoku.cpp credits to original authers
+ *
  * Description: Standard 9x9 sudoku problems.
+ *
+ * Type ./queens -help for help
+ *
+ * Size Option: to run
+ * put A1.cpp in the same folder with this file
+ *
+ * ./queens [options] [index of example to run]
  *
  */
 
@@ -42,13 +51,7 @@ protected:
   /// Values for the fields
   IntVarArray x;
 public:
-  /// Propagation variants
-  enum {
-    PROP_NONE, ///< No additional constraints
-    PROP_SAME, ///< Use "same" constraint with integer model
-  };
-
-  /// Constructor
+  // Constructor
   SudokuInt(const SizeOptions& opt)
       : Sudoku(opt), x(*this, n*n*n*n, 1, n*n) {
     const int nn = n*n;
@@ -73,43 +76,7 @@ public:
         if (int v = examples[opt.size()][j][i])
           rel(*this, m(i,j), IRT_EQ, v);
 
-    if (opt.propagation() == PROP_SAME) {
-      // Implied constraints linking squares and rows
-      for (int b=0; b<n; b++) {
-        int b1c = 0;
-        int b2c = 0;
-        IntVarArgs bc1(nn-n);
-        IntVarArgs bc2(nn-n);
-        IntVarArgs br1(nn-n);
-        IntVarArgs br2(nn-n);
-        for (int i=0; i<n; i++)
-          for (int j=0; j<n; j++) {
-            b1c = 0; b2c = 0;
-            for (int k=0; k<n; k++) {
-              if (k != j) {
-                IntVarArgs bc1s = block_col(m, b, i, k);
-                IntVarArgs br1s = block_row(m, b, i, k);
-                for (int count=0; count<n; count++) {
-                  bc1[b1c] = bc1s[count];
-                  br1[b1c] = br1s[count];
-                  ++b1c;
-                }
-              }
-              if (k != i) {
-                IntVarArgs bc2s = block_col(m, b, k, j);
-                IntVarArgs br2s = block_row(m, b, k, j);
-                for (int count=0; count<n; count++) {
-                  bc2[b2c] = bc2s[count];
-                  br2[b2c] = br2s[count];
-                  ++b2c;
-                }
-              }
-            }
-            same(*this, nn, bc1, bc2);
-            same(*this, nn, br1, br2);
-          }
-      }
-    }
+
 
     if (opt.branching() == BRANCH_NONE) {
       branch(*this, x, INT_VAR_NONE(), INT_VAL_SPLIT_MIN());
@@ -175,41 +142,31 @@ private:
   }
 };
 
-
 int
 main(int argc, char* argv[]) {
+  std::string title = "Sudoku Example ";
+  SizeOptions opt(title.c_str());
+  opt.size(0);
+  //    opt.icl(ICL_DEF);  // 55 nodes
+  //   opt.icl(ICL_VAL);  // 55 nodes
+  opt.icl(ICL_DOM);  // 1 node. This is the fastest way ICL option
+  opt.solutions(1);
 
-  std::cout << "Number of Examples: " << numOfExamples << std::endl;
+  opt.branching(Sudoku::BRANCH_SIZE_AFC);
+  opt.branching(Sudoku::BRANCH_NONE, "none", "none");
+  opt.branching(Sudoku::BRANCH_SIZE, "size", "min size");
+  opt.branching(Sudoku::BRANCH_SIZE_DEGREE, "sizedeg", "min size over degree");
+  opt.branching(Sudoku::BRANCH_SIZE_AFC, "sizeafc", "min size over afc");
+  opt.branching(Sudoku::BRANCH_AFC, "afc", "maximum afc");
+  opt.parse(argc,argv);
 
-  for (int i=0; i<numOfExamples; i++) {
-    std::string title = "Sudoku Example ";
-    title += std::to_string(i+1);
-    SizeOptions opt(title.c_str());
-    opt.size(0);
-    opt.icl(ICL_DOM);
-    opt.solutions(1);
-
-    opt.propagation(SudokuInt::PROP_NONE);
-    opt.propagation(SudokuInt::PROP_NONE, "none", "no additional constraints");
-    opt.propagation(SudokuInt::PROP_SAME, "same",
-                    "additional \"same\" constraint for integer model");
-
-    opt.branching(Sudoku::BRANCH_SIZE_AFC);
-    opt.branching(Sudoku::BRANCH_NONE, "none", "none");
-    opt.branching(Sudoku::BRANCH_SIZE, "size", "min size");
-    opt.branching(Sudoku::BRANCH_SIZE_DEGREE, "sizedeg", "min size over degree");
-    opt.branching(Sudoku::BRANCH_SIZE_AFC, "sizeafc", "min size over afc");
-    opt.branching(Sudoku::BRANCH_AFC, "afc", "maximum afc");
-    opt.parse(argc,argv);
-
-    if (opt.size() >= numOfExamples) {
-      std::cerr << "Error: size must be between 0 and "
-      << numOfExamples-1 << std::endl;
-      return 1;
-    }
-
-    Script::run<SudokuInt,DFS,SizeOptions>(opt);
+  if (opt.size() >= numOfExamples) {
+    std::cerr << "Error: size must be between 0 and "
+    << numOfExamples-1 << std::endl;
+    return 1;
   }
+
+  Script::run<SudokuInt,DFS,SizeOptions>(opt);
 
   return 0;
 } // end of main

@@ -34,7 +34,7 @@ class SendMoreMoney : public Space {
 protected:
   IntVarArray l;
 public:
-  SendMoreMoney(void) : l(*this, 8, 0, 9) {
+  SendMoreMoney(void): l(*this, 8, 0, 9) {
     IntVar s(l[0]), e(l[1]), n(l[2]), d(l[3]),
            m(l[4]), o(l[5]), r(l[6]), y(l[7]);
     // no leading zeros
@@ -43,7 +43,8 @@ public:
     // all letters distinct
     distinct(*this, l);
     // linear equation
-    IntArgs c(4+4+5); IntVarArgs x(4+4+5);
+    IntArgs c(4+4+5);
+    IntVarArgs x(4+4+5);
     c[0]=1000; c[1]=100; c[2]=10; c[3]=1;
     x[0]=s;    x[1]=e;   x[2]=n;  x[3]=d;
     c[4]=1000; c[5]=100; c[6]=10; c[7]=1;

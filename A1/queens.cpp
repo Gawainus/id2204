@@ -65,7 +65,36 @@ public:
     }
 
     // Constraints for diagonals
+    unsigned int diagLeftDiff = dim+1;
+    unsigned int diagRightDiff = dim-1;
 
+    // main diagonals
+    IntVarArgs mainDiagLeft = x.slice(0, diagLeftDiff, dim);
+    IntVarArgs mainDiagRight = x.slice(dim-1, diagRightDiff, dim);
+    linear(*this, c, mainDiagLeft, IRT_LQ, 1);
+    linear(*this, c, mainDiagRight, IRT_LQ, 1);
+
+    // sub diagonals
+    for (int i=1; i<dim; i++) {
+      IntArgs subDiagC(dim-i);
+      for (int j=0; j<dim-i; j++) {
+        subDiagC[j] = 1;
+      }
+
+      IntVarArgs subDiagLeftUpper = x.slice(i, diagLeftDiff, dim-i);
+      IntVarArgs subDiagLeftLower = x.slice(dim*i, diagLeftDiff, dim-i);
+      IntVarArgs subDiagRightUpper = x.slice(dim-1-i, diagRightDiff, dim-i);
+      IntVarArgs subDiagRightLower = x.slice(dim*i+dim-1, diagRightDiff, dim-i);
+
+      linear(*this, subDiagC, subDiagLeftUpper, IRT_LQ, 1);
+      linear(*this, subDiagC, subDiagLeftLower, IRT_LQ, 1);
+      linear(*this, subDiagC, subDiagRightUpper, IRT_LQ, 1);
+      linear(*this, subDiagC, subDiagRightLower, IRT_LQ, 1);
+    }
+
+    branch(*this, x, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
+
+    /*
     if (opt.branching() == BRANCH_NONE) {
       branch(*this, x, INT_VAR_NONE(), INT_VAL_SPLIT_MIN());
     } else if (opt.branching() == BRANCH_SIZE) {
@@ -77,6 +106,7 @@ public:
     } else if (opt.branching() == BRANCH_AFC) {
       branch(*this, x, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_SPLIT_MIN());
     }
+     */
   }
 
   /// Constructor for cloning \a s
@@ -139,18 +169,20 @@ main(int argc, char* argv[]) {
   opt.branching(Queens::BRANCH_SIZE_DEGREE, "sizedeg", "min size over degree");
   opt.branching(Queens::BRANCH_SIZE_AFC, "sizeafc", "min size over afc");
   opt.branching(Queens::BRANCH_AFC, "afc", "maximum afc");
+
   opt.parse(argc,argv);
 
-  QueensInt queensInt(opt, 6);
+  QueensInt queensInt(opt, 100);
   DFS<QueensInt> dfs(&queensInt);
   // search and print all solutions
   int solnCount = 1;
-  while (QueensInt* qi = dfs.next()) {
+  if (QueensInt* qi = dfs.next()) {
     std::cout << "Solution " << std::to_string(solnCount) << ":" << std::endl;
     qi->print();
     delete qi;
     std::cout << std::endl;
     solnCount++;
   }
+  std::cout << solnCount << std::endl;
   return 0;
 } // end of main
