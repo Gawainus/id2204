@@ -1,188 +1,226 @@
+/* -*- mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*- */
 /*
- * id2204 A1
- * Author: Yumen & Marion
+ *  Main authors:
+ *     Christian Schulte <schulte@gecode.org>
+ *     Yumen & Marion
  *
- * Description:
- * If there is a row or a column that does not have a queen, then,
- * by pigeon hole principle, there is a row or column that has
- * more than one queen which make the board in an attacking state.
+ *  Copyright:
+ *     Christian Schulte, 2001
  *
- * So sum of number on each tile by row, by column or by diagonal
- * should all be 1
+ *  This file is part of Gecode, the generic constraint
+ *  development environment:
+ *     http://www.gecode.org
+ *
+ *  In this model, the constraints are the following:
+ *  - there must be exactly one tile in each row and in each column
+ *  - every diagonal contains at most one tile
+ *
+ *  Several branching options are available, the best one we have found
+ *  is the default one based on AFC. During the branching, we always start
+ *  with the maximum value (which is 1) because it propagates more constraints
  */
 
+
+
 #include <gecode/driver.hh>
+#include <gecode/int.hh>
+#include <gecode/minimodel.hh>
+
+#if defined(GECODE_HAS_QT) && defined(GECODE_HAS_GIST)
+#include <QtGui>
+#if QT_VERSION >= 0x050000
+#include <QtWidgets>
+#endif
+#endif
 
 using namespace Gecode;
 
-class Queens: public Script {
-protected:
-  const int dim; // the dimension of the chess board
+/**
+ * \brief %Example: n-%Queens puzzle
+ *
+ * Place n queens on an n times n chessboard such that they do not
+ * attack each other.
+ *
+ * \ingroup Example
+ *
+ */
+class Queens : public Script {
 public:
+  /// Position of queens on boards (1 or 0)
+  IntVarArray q;
 
   // Branching variants
   enum {
     BRANCH_NONE,        ///< Use lexicographic ordering
     BRANCH_SIZE,        ///< Use minimum size
-    BRANCH_SIZE_DEGREE, ///< Use minimum size over degree
     BRANCH_SIZE_AFC,    ///< Use minimum size over afc
     BRANCH_AFC          ///< Use maximum afc
   };
-
-  /// Ctr
-  Queens(const SizeOptions& opt, unsigned int n): Script(opt), dim(n) {}
-
-  /// Copy ctr
-  Queens(bool share, Queens& s) : Script(share,s), dim(s.dim) {}
-
-}; // end of class Queens
-
-class QueensInt : virtual public Queens {
-protected:
-  /// Values for the whole board with dimxdim elements either 0 or 1
-  IntVarArray x;
-public:
-  /// Propagation variants
-  enum {
-    PROP_NONE, ///< No additional constraints
-    PROP_SAME, ///< Use "same" constraint with integer model
-  };
-
-  /// Constructor
-  QueensInt(const SizeOptions& opt, unsigned int n)
-      : Queens(opt, n), x(*this, dim*dim, 0, 1) {
-    Matrix<IntVarArray> m(x, dim, dim);
-
-    IntArgs c(dim);
-    for (int i=0; i<dim; i++) {
-      c[i] = 1;
+  
+  /// The actual problem
+  Queens(const SizeOptions& opt)
+    : Script(opt), q(*this,opt.size()*opt.size(),0,1) {
+    int n = opt.size();
+    Matrix<IntVarArray> m(q, n, n);
+    
+    // only one 1 on each row
+    for (int i = 0; i<n; i++) {
+      linear(*this, m.row(i), IRT_EQ, 1);
     }
 
-    // Constraints for rows and columns
-    for (int i=0; i<dim; i++) {
-      linear(*this, c, m.col(i), IRT_EQ, 1);
-      linear(*this, c, m.row(i), IRT_EQ, 1);
+    // only one 1 on each column
+    for (int j = 0; j<n; j++) {
+      linear(*this, m.col(j), IRT_EQ, 1);
     }
 
-    // Constraints for diagonals
-    unsigned int diagLeftDiff = dim+1;
-    unsigned int diagRightDiff = dim-1;
-
-    // main diagonals
-    IntVarArgs mainDiagLeft = x.slice(0, diagLeftDiff, dim);
-    IntVarArgs mainDiagRight = x.slice(dim-1, diagRightDiff, dim);
-    linear(*this, c, mainDiagLeft, IRT_LQ, 1);
-    linear(*this, c, mainDiagRight, IRT_LQ, 1);
-
-    // sub diagonals
-    for (int i=1; i<dim; i++) {
-      IntArgs subDiagC(dim-i);
-      for (int j=0; j<dim-i; j++) {
-        subDiagC[j] = 1;
-      }
-
-      IntVarArgs subDiagLeftUpper = x.slice(i, diagLeftDiff, dim-i);
-      IntVarArgs subDiagLeftLower = x.slice(dim*i, diagLeftDiff, dim-i);
-      IntVarArgs subDiagRightUpper = x.slice(dim-1-i, diagRightDiff, dim-i);
-      IntVarArgs subDiagRightLower = x.slice(dim*i+dim-1, diagRightDiff, dim-i);
-
-      linear(*this, subDiagC, subDiagLeftUpper, IRT_LQ, 1);
-      linear(*this, subDiagC, subDiagLeftLower, IRT_LQ, 1);
-      linear(*this, subDiagC, subDiagRightUpper, IRT_LQ, 1);
-      linear(*this, subDiagC, subDiagRightLower, IRT_LQ, 1);
+    // constraint on each diagonal : no more than one tile
+    for (int i=0; i<=n-2; i++){
+      count(*this, q.slice(i, n+1, n-i), 1, IRT_LQ, 1);
     }
 
-    branch(*this, x, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
+    for (int i=1; i<=n-2; i++){
+      count(*this, q.slice(i*n, n+1, n-i), 1, IRT_LQ, 1);
+    }
 
-    /*
+    for (int i=1; i<=n-2; i++){
+      count(*this, q.slice(i*n, -(n-1), i+1), 1, IRT_LQ, 1);
+    }
+
+    for (int i=2; i<=n-1; i++){
+      count(*this, q.slice(i*n-1, n-1, n-i+1), 1, IRT_LQ, 1);
+    }
+
+    count(*this, q.slice(n-1,n-1,n), 1, IRT_LQ, 1);
+
     if (opt.branching() == BRANCH_NONE) {
-      branch(*this, x, INT_VAR_NONE(), INT_VAL_SPLIT_MIN());
+      branch(*this, q, INT_VAR_NONE(), INT_VAL_SPLIT_MAX());
     } else if (opt.branching() == BRANCH_SIZE) {
-      branch(*this, x, INT_VAR_SIZE_MIN(), INT_VAL_SPLIT_MIN());
-    } else if (opt.branching() == BRANCH_SIZE_DEGREE) {
-      branch(*this, x, INT_VAR_DEGREE_SIZE_MAX(), INT_VAL_SPLIT_MIN());
+      branch(*this, q, INT_VAR_SIZE_MIN(), INT_VAL_MAX());
     } else if (opt.branching() == BRANCH_SIZE_AFC) {
-      branch(*this, x, INT_VAR_AFC_SIZE_MAX(opt.decay()), INT_VAL_SPLIT_MIN());
+      branch(*this, q, INT_VAR_AFC_SIZE_MAX(opt.decay()), INT_VAL_MAX());
     } else if (opt.branching() == BRANCH_AFC) {
-      branch(*this, x, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_SPLIT_MIN());
+      branch(*this, q, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
     }
-     */
   }
 
   /// Constructor for cloning \a s
-  QueensInt(bool share, QueensInt& s) : Queens(share, s) {
-    x.update(*this, share, s.x);
+  Queens(bool share, Queens& s) : Script(share,s) {
+    q.update(*this, share, s.q);
   }
 
   /// Perform copying during cloning
   virtual Space*
   copy(bool share) {
-    return new QueensInt(share,*this);
+    return new Queens(share,*this);
   }
 
   /// Print solution
   virtual void
   print(std::ostream& os) const {
-    os << "  ";
-    for (int i = 0; i<dim*dim; i++) {
-      if (x[i].assigned()) {
-        if (x[i].val()<10)
-          os << x[i] << " ";
-        else
-          os << (char)(x[i].val()+'A'-10) << " ";
-      }
-      else
-        os << ". ";
-      if((i+1)%(dim*dim) == 0)
-        os << std::endl << "  ";
+    for (int i = 0; i < q.size(); i++) {
+      int n = sqrt(q.size());
+      os << q[i] << " ";
+      if ((i+1) % n == 0)
+        os << std::endl;
     }
     os << std::endl;
   }
+};
 
-  void print(void) const {
-    for (int i=0; i<dim; i++) {
-      for (int j=0; j<dim; j++) {
-        std::cout << x[i*dim+j] << " ";
-      }
-      std::cout << std::endl;
+#if defined(GECODE_HAS_QT) && defined(GECODE_HAS_GIST)
+/// Inspector showing queens on a chess board
+class QueensInspector : public Gist::Inspector {
+protected:
+  /// The graphics scene displaying the board
+  QGraphicsScene* scene;
+  /// The window containing the graphics scene
+  QMainWindow* mw;
+  /// The size of a field on the board
+  static const int unit = 20;
+public:
+  /// Constructor
+  QueensInspector(void) : scene(NULL), mw(NULL) {}
+  /// Inspect space \a s
+  virtual void inspect(const Space& s) {
+    const Queens& q = static_cast<const Queens&>(s);
+    const int n = sqrt(q.q.size());
+    Matrix<IntVarArray> m(q.q, n, n);
+    
+    if (!scene)
+      initialize();
+    QList <QGraphicsItem*> itemList = scene->items();
+    foreach (QGraphicsItem* i, scene->items()) {
+      scene->removeItem(i);
+      delete i;
     }
+
+    for (int i=0; i<n; i++) {
+      for (int j=0; j<n; j++) {
+        scene->addRect(i*unit,j*unit,unit,unit);
+        QBrush b(m(i,j).assigned() ? Qt::black : Qt::red);
+        QPen p(m(i,j).assigned() ? Qt::black : Qt::white);
+        for (IntVarValues xv(m(i,j)); xv(); ++xv) {
+          if( xv.val() == 1)
+            scene->addEllipse(QRectF(i*unit+unit/4,j*unit+unit/4,
+                                     unit/2,unit/2), p, b);
+        } 
+      }
+    }
+    mw->show();    
   }
+    
+  /// Set up main window
+  void initialize(void) {
+    mw = new QMainWindow();
+    scene = new QGraphicsScene();
+    QGraphicsView* view = new QGraphicsView(scene);
+    view->setRenderHints(QPainter::Antialiasing);
+    mw->setCentralWidget(view);
+    mw->setAttribute(Qt::WA_QuitOnClose, false);
+    mw->setAttribute(Qt::WA_DeleteOnClose, false);
+    QAction* closeWindow = new QAction("Close window", mw);
+    closeWindow->setShortcut(QKeySequence("Ctrl+W"));
+    mw->connect(closeWindow, SIGNAL(triggered()),
+                mw, SLOT(close()));
+    mw->addAction(closeWindow);
+  }
+  
+  /// Name of the inspector
+  virtual std::string name(void) { return "Board"; }
+  /// Finalize inspector
+  virtual void finalize(void) {
+    delete mw;
+    mw = NULL;
+  }
+};
 
-}; // end of class QueensInt
+#endif /* GECODE_HAS_GIST */
 
-
+/** \brief Main-function
+ *  \relates Queens
+ */
 int
 main(int argc, char* argv[]) {
   SizeOptions opt("Queens");
-  opt.size(0);
-  opt.icl(ICL_DOM);
-  opt.solutions(2);
+  opt.iterations(500);
+  opt.size(8);
+  opt.solutions(1);
 
-  opt.propagation(QueensInt::PROP_NONE);
-  opt.propagation(QueensInt::PROP_NONE, "none", "no additional constraints");
-  opt.propagation(QueensInt::PROP_SAME, "same",
-                  "additional \"same\" constraint for integer model");
-
-  opt.branching(Queens::BRANCH_SIZE_AFC);
+  opt.branching(Queens::BRANCH_AFC);
   opt.branching(Queens::BRANCH_NONE, "none", "none");
   opt.branching(Queens::BRANCH_SIZE, "size", "min size");
-  opt.branching(Queens::BRANCH_SIZE_DEGREE, "sizedeg", "min size over degree");
   opt.branching(Queens::BRANCH_SIZE_AFC, "sizeafc", "min size over afc");
   opt.branching(Queens::BRANCH_AFC, "afc", "maximum afc");
+  
+#if defined(GECODE_HAS_QT) && defined(GECODE_HAS_GIST)
+  QueensInspector ki;
+  opt.inspect.click(&ki);
+#endif
 
   opt.parse(argc,argv);
-
-  QueensInt queensInt(opt, 100);
-  DFS<QueensInt> dfs(&queensInt);
-  // search and print all solutions
-  int solnCount = 1;
-  if (QueensInt* qi = dfs.next()) {
-    std::cout << "Solution " << std::to_string(solnCount) << ":" << std::endl;
-    qi->print();
-    delete qi;
-    std::cout << std::endl;
-    solnCount++;
-  }
-  std::cout << solnCount << std::endl;
+  Script::run<Queens,DFS,SizeOptions>(opt);
   return 0;
-} // end of main
+}
+
+// STATISTICS: example-any
+

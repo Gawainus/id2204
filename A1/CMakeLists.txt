@@ -15,6 +15,9 @@ set(GECODE_LIBS
         -lgecodekernel
         -lgecodesupport)
 
+# check version with "qmake --version"
+find_package(Qt4)
+      
 set(SEND_MORE_MONEY_FILES
         send-more-money.cpp)
 
@@ -31,4 +34,4 @@ add_executable(sudoku ${SUDOKU_FILES})
 target_link_libraries(sudoku ${GECODE_LIBS})
 
 add_executable(queens ${QUEENS_FILES})
-target_link_libraries(queens ${GECODE_LIBS})
+target_link_libraries(queens ${GECODE_LIBS} Qt4::QtGui)

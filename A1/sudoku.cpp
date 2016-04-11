@@ -13,6 +13,8 @@
  *
  * ./queens [options] [index of example to run]
  *
+ * Comments about the icl options can be found in the main function
+ *
  */
 
 #include <gecode/driver.hh>
@@ -105,40 +107,23 @@ public:
   /// Print solution
   virtual void
   print(std::ostream& os) const {
-    os << "  ";
-    for (int i = 0; i<n*n*n*n; i++) {
-      if (x[i].assigned()) {
-        if (x[i].val()<10)
-          os << x[i] << " ";
-        else
-          os << (char)(x[i].val()+'A'-10) << " ";
+    os << "-------------------------------" << std::endl;
+    for (int i=0; i<n; i++){
+      for (int j=0; j<n; j++){
+	os << "| ";
+	for (int k=0; k<n*n; k++){
+	  if (x[(i*n+j)*n*n+k].assigned())
+	    os << x[(i*n+j)*n*n+k] << " ";
+	  else
+	    os << ". ";
+	  if ((k+1)%n==0)
+	    os << "|";
+	  os << " ";
+	}
+	os<< std::endl;
       }
-      else
-        os << ". ";
-      if((i+1)%(n*n) == 0)
-        os << std::endl << "  ";
+      os << "-------------------------------" << std::endl;
     }
-    os << std::endl;
-  }
-
-private:
-  /// Post the constraint that \a a and \a b take the same values
-  void same(Space& home, int nn, IntVarArgs a, IntVarArgs b) {
-    SetVar u(home, IntSet::empty, 1, nn);
-    rel(home, SOT_DUNION, a, u);
-    rel(home, SOT_DUNION, b, u);
-  }
-
-  /// Extract column \a bc from block starting at (\a i,\a j)
-  IntVarArgs
-  block_col(Matrix<IntVarArray> m, int bc, int i, int j) {
-    return m.slice(bc*n+i, bc*n+i+1, j*n, (j+1)*n);
-  }
-
-  /// Extract row \a br from block starting at (\a i,\a j)
-  IntVarArgs
-  block_row(Matrix<IntVarArray> m, int br, int i, int j) {
-    return m.slice(j*n, (j+1)*n, br*n+i, br*n+i+1);
   }
 };
 
@@ -147,9 +132,10 @@ main(int argc, char* argv[]) {
   std::string title = "Sudoku Example ";
   SizeOptions opt(title.c_str());
   opt.size(0);
-  //    opt.icl(ICL_DEF);  // 55 nodes
-  //   opt.icl(ICL_VAL);  // 55 nodes
-  opt.icl(ICL_DOM);  // 1 node. This is the fastest way ICL option
+  //   opt.icl(ICL_DEF);  // 55 nodes in search-tree for example 0
+  //   opt.icl(ICL_VAL);  // 55 nodes in search-tree for example 0
+  //   opt.icl(ICL_BND);  // 13 nodes in search-tree for example 0
+  opt.icl(ICL_DOM);  // 1 node. This is the ICL option with the smallest search tree
   opt.solutions(1);
 
   opt.branching(Sudoku::BRANCH_SIZE_AFC);
