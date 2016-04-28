@@ -123,46 +123,6 @@ square/fast:
 	$(MAKE) -f CMakeFiles/square.dir/build.make CMakeFiles/square.dir/build
 .PHONY : square/fast
 
-#=============================================================================
-# Target rules for targets named no-overlap
-
-# Build rule for target.
-no-overlap: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 no-overlap
-.PHONY : no-overlap
-
-# fast build rule for target.
-no-overlap/fast:
-	$(MAKE) -f CMakeFiles/no-overlap.dir/build.make CMakeFiles/no-overlap.dir/build
-.PHONY : no-overlap/fast
-
-no-overlap.o: no-overlap.cpp.o
-
-.PHONY : no-overlap.o
-
-# target to build an object file
-no-overlap.cpp.o:
-	$(MAKE) -f CMakeFiles/no-overlap.dir/build.make CMakeFiles/no-overlap.dir/no-overlap.cpp.o
-.PHONY : no-overlap.cpp.o
-
-no-overlap.i: no-overlap.cpp.i
-
-.PHONY : no-overlap.i
-
-# target to preprocess a source file
-no-overlap.cpp.i:
-	$(MAKE) -f CMakeFiles/no-overlap.dir/build.make CMakeFiles/no-overlap.dir/no-overlap.cpp.i
-.PHONY : no-overlap.cpp.i
-
-no-overlap.s: no-overlap.cpp.s
-
-.PHONY : no-overlap.s
-
-# target to generate assembly for a file
-no-overlap.cpp.s:
-	$(MAKE) -f CMakeFiles/no-overlap.dir/build.make CMakeFiles/no-overlap.dir/no-overlap.cpp.s
-.PHONY : no-overlap.cpp.s
-
 square.o: square.cpp.o
 
 .PHONY : square.o
@@ -199,10 +159,6 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
 	@echo "... square"
-	@echo "... no-overlap"
-	@echo "... no-overlap.o"
-	@echo "... no-overlap.i"
-	@echo "... no-overlap.s"
 	@echo "... square.o"
 	@echo "... square.i"
 	@echo "... square.s"

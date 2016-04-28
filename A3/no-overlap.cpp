@@ -26,6 +26,7 @@
  *
  */
 
+
 #include <gecode/int.hh>
 
 using namespace Gecode;
@@ -81,15 +82,42 @@ public:
 
   // Return cost (defined as cheap quadratic)
   virtual PropCost cost(const Space&, const ModEventDelta&) const {
-    return PropCost::quadratic(PropCost::LO,2*x.size());
+    return PropCost::quadratic(PropCost::LO, 2*x.size());
   }
 
   // Perform propagation
   virtual ExecStatus propagate(Space& home, const ModEventDelta&) {
     // TODO: complete this function
 
+    int n = x.size();
+    bool subSumed = true;
+    for (auto xItr: x) {
+      subSumed &= xItr.assigned();
+    }
+    for (auto yIter: y) {
+      subSumed &= yIter.assigned();
+    }
+    if (subSumed) {
+      return home.ES_SUBSUMED(* this);
+    }
 
+    for (int i=0; i<n-1; i++) {
+      for (int j = i + 1; j < n - 1; j++) {
+        bool overlapped =
+            x[i].gq(home, x[j].min()+w[j]) == Int::ME_INT_FAILED &&
+            x[j].gq(home, x[i].min()+w[i]) == Int::ME_INT_FAILED &&
+            y[i].gq(home, y[j].min()+h[j]) == Int::ME_INT_FAILED &&
+            y[j].gq(home, y[i].min()+h[i]) == Int::ME_INT_FAILED;
+        if (overlapped)
+          return ES_FAILED;
+      }
+    }
     return ES_OK;
+
+    return ES_NOFIX;
+    return ES_FIX;
+    return ES_NOFIX_FORCE;
+    return __ES_PARTIAL;
   }
 
   // Dispose propagator and return its size
@@ -99,7 +127,7 @@ public:
     (void) Propagator::dispose(home);
     return sizeof(*this);
   }
-};
+}; // end of class NoOverlap
 
 /*
  * Post the constraint that the rectangles defined by the coordinates
