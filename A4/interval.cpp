@@ -106,6 +106,7 @@ public:
     for (int i=x.size(); i--; )
       w[i]=b.w[i];
   }
+
   // Copy brancher
   virtual Actor* copy(Space& home, bool share) {
     return new (home) IntervalBrancher(home, share, *this);
@@ -140,7 +141,8 @@ public:
     // Again, you have to take care of the additional information
     int pos, min, max;
     e >> pos >> min >> max;
-    return new Description(*this, pos, alternatives(max-min, interval_size(pos)), min, max);
+    return new Description(*this, pos,
+                           alternatives(max-min, interval_size(pos)), min, max);
   }
   // Perform commit for choice c and alternative a
   virtual ExecStatus commit(Space& home, 

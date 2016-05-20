@@ -26,7 +26,7 @@
  */
 
 #include <gecode/driver.hh>
-#include <interval.cpp>
+#include "interval.cpp"
 
 using namespace Gecode;
 using namespace Gecode::Int;
