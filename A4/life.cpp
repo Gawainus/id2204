@@ -41,9 +41,9 @@
 
 #if defined(GECODE_HAS_QT) && defined(GECODE_HAS_GIST)
 #include <QtGui>
-#if QT_VERSION >= 0x050000
-#include <QtWidgets>
-#endif
+  #if QT_VERSION >= 0x050000
+  #include <QtWidgets>
+  #endif
 #endif
 
 using namespace Gecode;
@@ -57,72 +57,121 @@ using namespace Gecode;
  * \ingroup Example
  *
  */
-class Life : public Script {
+
+class Life: public Script {
 public:
-  /// Number of live cells
+  // dimension of the board
+  int dim;
+  int dimWithBorder;
+
+  // Number of live cells
   IntVar c;
-  /// Position of live cells
+
+  // Position of live cells
   IntVarArray q;
-  /// The actual problem
-  Life(const SizeOptions& opt)
-    : Script(opt){
-    int n = opt.size();
-    c = IntVar(*this,1,(n/3)*(n/3)*4 + (n%3)*n*2 - (n%3)*(n%3));
-    q = IntVarArray(*this,(n+2)*(n+2),0,1);
 
-    Matrix<IntVarArray> m(q, n+2, n+2);
+  // The actual problem
+  Life(const SizeOptions& opt) : Script(opt) {
+    dim = opt.size();
+    dimWithBorder = dim+2;
+    // c = IntVar(*this, 1, (n/3)*(n/3)*4 + (n%3)*n*2 - (n%3)*(n%3));
+    c = IntVar(*this, 1, dim*dim);
+    q = IntVarArray(*this, dimWithBorder*dimWithBorder, 0, 1);
 
-    //border
-    for (int i = 0; i<n+2; i++){
+    Matrix<IntVarArray> m(q, dimWithBorder, dimWithBorder);
+
+    // border
+    for (int i = 0; i<dimWithBorder; i++){
       rel(*this, m(0,i) == 0);
-      rel(*this, m(n+1,i) == 0);
+      rel(*this, m(dim+1,i) == 0);
       rel(*this, m(i,0) == 0);
-      rel(*this, m(i,n+1) == 0);
+      rel(*this, m(i,dim+1) == 0);
     }
 
     // number of live cells
     rel(*this, sum(q) == c);
 
     //Stay alive
-    for (int i=1; i<=n; i++){
-      for (int j=1; j<=n; j++){
+    for (int i=1; i<=dim; i++){
+      for (int j=1; j<=dim; j++){
         LinIntExpr around =
           m(i-1,j-1) + m(i,j-1) + m(i+1,j-1) +
           m(i-1,j) + m(i+1,j) +
           m(i-1,j+1) + m(i,j+1) + m(i+1,j+1);
+
         rel(*this, (m(i,j)==1) >> ((around == 2) || (around ==3)));
         rel(*this, (m(i,j)==0) >> (around != 3));
       }
     }
+
     branch(*this, c, INT_VAL_MAX());
     branch(*this, q, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
   }
 
-  /// Constructor for cloning \a s
-  Life(bool share, Life& s) : Script(share,s) {
-    q.update(*this, share, s.q);
-    c.update(*this, share, s.c);
+  // Constructor for cloning \a s
+  Life(bool share, Life& life) : Script(share, life) {
+    dim = life.dim;
+    dimWithBorder = life.dimWithBorder;
+
+    q.update(*this, share, life.q);
+    c.update(*this, share, life.c);
   }
 
-  /// Perform copying during cloning
-  virtual Space*
-  copy(bool share) {
-    return new Life(share,*this);
+  // Perform copying during cloning
+  virtual Space* copy(bool share) {
+    return new Life(share, *this);
   }
 
-  /// Print solution
-  virtual void
-  print(std::ostream& os) const {
+  // Print solution
+  virtual void print(std::ostream& os) const {
+    bool checks = true;
+    for (int i = 1; i <= dim; i++) {
+      for (int j = 1; j <= dim; j++) {
+        int sumOfNeibors =
+            q[(i-1)*(dimWithBorder)+j-1].val() +
+                q[(i-1)*(dimWithBorder)+j].val()+
+                q[(i-1)*(dimWithBorder)+j+1].val()+
+                q[i*(dimWithBorder)+j-1].val()+
+                q[i*(dimWithBorder)+j+1].val()+
+                q[(i+1)*(dimWithBorder)+j-1].val()+
+                q[(i+1)*(dimWithBorder)+j].val()+
+                q[(i+1)*(dimWithBorder)+j+1].val();
+        bool nonStillCond =
+            ((q[i*(dimWithBorder)+j].val() == 1) && sumOfNeibors>3 || sumOfNeibors<2)
+                            ||
+            ((q[i*(dimWithBorder)+j].val() == 0) && sumOfNeibors == 3);
+        if (nonStillCond) {
+          checks = false;
+          os << "Cell (" << i << ", " << j << ") " << "is not still." << std::endl;
+        }
+      }
+    }
+    if (checks) {
+      os << "The solution checks." << std::endl
+      << "Every live cell has 2 or 3 neighbors." << std::endl
+      << "Every dead cell has no 3 neighbors." << std::endl;
+
+    }
+    else {
+      os << "The Board is not still!" << std:: endl;
+    }
     os << "Number of live cells: " << c << std::endl << std::endl;
-    int n = sqrt(q.size())-2;
-    for (int i = 1; i <= n; i++) {
-      for (int j = 1; j <= n; j++) {
-        os << q[i*(n+2)+j];
+    for (int i = 0; i < dimWithBorder; i++) {
+      for (int j = 0; j < dimWithBorder; j++) {
+        int cell = q[i*(dimWithBorder)+j].val();
+        if (cell == 1) {
+          os << "O";
+
+        }
+        else {
+          os << " ";
+
+        }
       }
       os << std::endl;
     }
   }
-};
+}; // end of Life class
 
 
 #if defined(GECODE_HAS_QT) && defined(GECODE_HAS_GIST)
@@ -141,7 +190,7 @@ public:
   /// Inspect space \a s
   virtual void inspect(const Space& s) {
     const Life& q = static_cast<const Life&>(s);
-    const int n = sqrt(q.q.size())-2;
+    const int n = q.dim;
     Matrix<IntVarArray> m(q.q, n+2, n+2);
     
     if (!scene)
@@ -171,34 +220,37 @@ public:
   void initialize(void) {
     mw = new QMainWindow();
     scene = new QGraphicsScene();
+
     QGraphicsView* view = new QGraphicsView(scene);
     view->setRenderHints(QPainter::Antialiasing);
     mw->setCentralWidget(view);
     mw->setAttribute(Qt::WA_QuitOnClose, false);
     mw->setAttribute(Qt::WA_DeleteOnClose, false);
+
     QAction* closeWindow = new QAction("Close window", mw);
     closeWindow->setShortcut(QKeySequence("Ctrl+W"));
-    mw->connect(closeWindow, SIGNAL(triggered()),
-                mw, SLOT(close()));
+    mw->connect(closeWindow, SIGNAL(triggered()), mw, SLOT(close()));
     mw->addAction(closeWindow);
   }
   
   /// Name of the inspector
-  virtual std::string name(void) { return "Board"; }
+  virtual std::string name(void) {
+    return "Board";
+  }
+
   /// Finalize inspector
   virtual void finalize(void) {
     delete mw;
     mw = NULL;
   }
-};
+}; // end of class LifeInspector
 
-#endif /* GECODE_HAS_GIST */
+#endif // GECODE_HAS_GIST
 
 /** \brief Main-function
  *  \relates Life
  */
-int
-main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   SizeOptions opt("Life");
   opt.iterations(500);
   opt.size(5);
@@ -209,9 +261,8 @@ main(int argc, char* argv[]) {
 #endif
 
   opt.parse(argc,argv);
-  Script::run<Life,DFS,SizeOptions>(opt);
+  Script::run<Life, DFS, SizeOptions>(opt);
   return 0;
-}
+} // end of Main
 
 // STATISTICS: example-any
-

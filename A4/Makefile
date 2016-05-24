@@ -111,6 +111,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named life
+
+# Build rule for target.
+life: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 life
+.PHONY : life
+
+# fast build rule for target.
+life/fast:
+	$(MAKE) -f CMakeFiles/life.dir/build.make CMakeFiles/life.dir/build
+.PHONY : life/fast
+
+#=============================================================================
 # Target rules for targets named square
 
 # Build rule for target.
@@ -122,6 +135,33 @@ square: cmake_check_build_system
 square/fast:
 	$(MAKE) -f CMakeFiles/square.dir/build.make CMakeFiles/square.dir/build
 .PHONY : square/fast
+
+life.o: life.cpp.o
+
+.PHONY : life.o
+
+# target to build an object file
+life.cpp.o:
+	$(MAKE) -f CMakeFiles/life.dir/build.make CMakeFiles/life.dir/life.cpp.o
+.PHONY : life.cpp.o
+
+life.i: life.cpp.i
+
+.PHONY : life.i
+
+# target to preprocess a source file
+life.cpp.i:
+	$(MAKE) -f CMakeFiles/life.dir/build.make CMakeFiles/life.dir/life.cpp.i
+.PHONY : life.cpp.i
+
+life.s: life.cpp.s
+
+.PHONY : life.s
+
+# target to generate assembly for a file
+life.cpp.s:
+	$(MAKE) -f CMakeFiles/life.dir/build.make CMakeFiles/life.dir/life.cpp.s
+.PHONY : life.cpp.s
 
 square.o: square.cpp.o
 
@@ -157,8 +197,12 @@ help:
 	@echo "... clean"
 	@echo "... depend"
 	@echo "... rebuild_cache"
+	@echo "... life"
 	@echo "... edit_cache"
 	@echo "... square"
+	@echo "... life.o"
+	@echo "... life.i"
+	@echo "... life.s"
 	@echo "... square.o"
 	@echo "... square.i"
 	@echo "... square.s"
