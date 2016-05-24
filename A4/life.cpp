@@ -64,6 +64,9 @@ public:
   int dim;
   int dimWithBorder;
 
+  int headIdx = 2;
+  int tailIdx;
+
   // Number of live cells
   IntVar c;
 
@@ -73,31 +76,41 @@ public:
   // The actual problem
   Life(const SizeOptions& opt) : Script(opt) {
     dim = opt.size();
-    dimWithBorder = dim+2;
+    dimWithBorder = dim+4;
+    tailIdx = headIdx+dim-1;
+
     // c = IntVar(*this, 1, (n/3)*(n/3)*4 + (n%3)*n*2 - (n%3)*(n%3));
     c = IntVar(*this, 1, dim*dim);
     q = IntVarArray(*this, dimWithBorder*dimWithBorder, 0, 1);
 
     Matrix<IntVarArray> m(q, dimWithBorder, dimWithBorder);
 
-    // border
+    // outer border
     for (int i = 0; i<dimWithBorder; i++){
       rel(*this, m(0,i) == 0);
-      rel(*this, m(dim+1,i) == 0);
-      rel(*this, m(i,0) == 0);
-      rel(*this, m(i,dim+1) == 0);
+      rel(*this, m(tailIdx+2, i) == 0);
+      rel(*this, m(i, 0) == 0);
+      rel(*this, m(i, tailIdx+2) == 0);
+    }
+
+    // inner
+    for (int i = 1; i<dimWithBorder-1; i++){
+      rel(*this, m(1, i) == 0);
+      rel(*this, m(tailIdx+1, i) == 0);
+      rel(*this, m(i, 1) == 0);
+      rel(*this, m(i, tailIdx+1) == 0);
     }
 
     // number of live cells
     rel(*this, sum(q) == c);
 
     //Stay alive
-    for (int i=1; i<=dim; i++){
-      for (int j=1; j<=dim; j++){
+    for (int i=headIdx-1; i<=tailIdx+1; i++){
+      for (int j=headIdx-1; j<=tailIdx+1; j++){
         LinIntExpr around =
-          m(i-1,j-1) + m(i,j-1) + m(i+1,j-1) +
-          m(i-1,j) + m(i+1,j) +
-          m(i-1,j+1) + m(i,j+1) + m(i+1,j+1);
+            m(i-1,j-1) + m(i,j-1) + m(i+1,j-1) +
+            m(i-1,j) + m(i+1,j) +
+            m(i-1,j+1) + m(i,j+1) + m(i+1,j+1);
 
         rel(*this, (m(i,j)==1) >> ((around == 2) || (around ==3)));
         rel(*this, (m(i,j)==0) >> (around != 3));
@@ -113,6 +126,9 @@ public:
     dim = life.dim;
     dimWithBorder = life.dimWithBorder;
 
+    headIdx = 2;
+    tailIdx = headIdx+dim-1;
+
     q.update(*this, share, life.q);
     c.update(*this, share, life.c);
   }
@@ -125,8 +141,8 @@ public:
   // Print solution
   virtual void print(std::ostream& os) const {
     bool checks = true;
-    for (int i = 1; i <= dim; i++) {
-      for (int j = 1; j <= dim; j++) {
+    for (int i = headIdx; i <= tailIdx; i++) {
+      for (int j = headIdx; j <= tailIdx; j++) {
         int sumOfNeibors =
             q[(i-1)*(dimWithBorder)+j-1].val() +
                 q[(i-1)*(dimWithBorder)+j].val()+
@@ -164,7 +180,7 @@ public:
 
         }
         else {
-          os << " ";
+          os << "-";
 
         }
       }
