@@ -35,6 +35,40 @@
  *
  */
 
+/* Solution for n=8
+ * Density: 36/64 = 0.5625
+ * 11011011
+ * 11011011
+ * 00000000
+ * 11011011
+ * 11011011
+ * 00000000
+ * 11011011
+ * 11011011
+
+ *
+ * Solution for n=9
+ * Density: 43/81 ~ 0.531
+ * 011011011
+ * 001011010
+ * 101000001
+ * 110111111
+ * 000100000
+ * 110101111
+ * 010101001
+ * 100101010
+ * 110011011
+ * 
+ *
+ * Note on the implementation:
+ * We also tried to implement a symmetry breaking condition by saying that
+ * the density in the upper half of the board should be higher or equal to
+ * the lower half, and the same for left and right. However, the computation
+ * were only slightly faster for some value of n, and slower for other values,
+ * so we finally removed these constraints.
+ */
+
+
 #include <gecode/driver.hh>
 
 #if defined(GECODE_HAS_QT) && defined(GECODE_HAS_GIST)
@@ -61,12 +95,12 @@ public:
   // dimensions of the board and borders
   int dim;
   int dimWithBorder; // extra two layers of border
-  int headIdx = 2; // the first index on the board after border cells
-  int tailIdx; // the last index on the board before border cells
+  int headIdx = 2;   // the first index on the board after border cells
+  int tailIdx;       // the last index on the board before border cells
 
   // Number of live cells
-  IntVar c;
-  IntVarArray csquare;
+  IntVar c;            // total number of live cells
+  IntVarArray csquare; // number of live cells inside each square of size 3*3
 
   // Position of live cells
   IntVarArray q;
@@ -83,12 +117,13 @@ public:
     // number of squares of size 3*3
     int squares = ceil(dim/3.)*ceil(dim/3.);
     c = IntVar(*this, 1, dim*dim);
+    // in each square of size 3*3, the number of live cells is limited by 6
     csquare = IntVarArray(*this, squares, 0, 6);
     q = IntVarArray(*this, dimWithBorder*dimWithBorder,0,1);
 
     Matrix<IntVarArray> m(q, dimWithBorder, dimWithBorder);
 
-    // outer border
+    // outer border (only dead cells)
     for (int i=0; i<dimWithBorder; i++) {
       rel(*this, m(0, i) == 0);
       rel(*this, m(i, 0) == 0);
@@ -96,7 +131,7 @@ public:
       rel(*this, m(i, dimWithBorder-1) == 0);
     }
 
-    // inner border
+    // inner border (only dead cells)
     for (int i=headIdx-1; i<=tailIdx+1; i++) {
       rel(*this, m(headIdx-1, i) == 0);
       rel(*this, m(i, headIdx-1) == 0);
@@ -114,9 +149,10 @@ public:
     }
     rel(*this, sum(csquare) == c);
     
-    // apply constraints to the board and the inner border
+    // apply still life constraints to the board and the inner border
     for (int i=headIdx-1; i<=tailIdx+1; i++){
       for (int j=headIdx-1; j<=tailIdx+1; j++){
+        // sum of all the values of the neighboors of cell (i,j)
         LinIntExpr around =
           m(i-1,j-1) + m(i,j-1) + m(i+1,j-1) +
           m(i-1,j) + m(i+1,j) +
@@ -129,12 +165,14 @@ public:
       }
     }
 
-    //Branching
+    // First branching on c in order to maximize the number of live cells
     branch(*this, c, INT_VAL_MAX());
 
     // Based on experiments,
-    // AFC branching works best for dimensions that is not divisible by 3
-    // while SQUARE branching works best for those divisible by 3
+    // AFC branching on the whole board works best for dimensions that is
+    // not divisible by 3, while SQUARE branching works best for those divisible by 3
+    // SQUARE branching consists in doing AFC branching on each 3*3 squares, taken
+    // in a lexicographic order
     if (dim%3 != 0) {
       branch(*this, q, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
     }
