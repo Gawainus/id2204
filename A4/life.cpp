@@ -36,8 +36,6 @@
  */
 
 #include <gecode/driver.hh>
-#include <gecode/int.hh>
-#include <gecode/minimodel.hh>
 
 #if defined(GECODE_HAS_QT) && defined(GECODE_HAS_GIST)
 #include <QtGui>
@@ -59,109 +57,107 @@ using namespace Gecode;
  */
 class Life : public Script {
 public:
-  /// Number of live cells
+
+  // dimensions of the board and borders
+  int dim;
+  int dimWithBorder; // extra two layers of border
+  int headIdx = 2; // the first index on the board after border cells
+  int tailIdx; // the last index on the board before border cells
+
+  // Number of live cells
   IntVar c;
   IntVarArray csquare;
-  /// Position of live cells
+
+  // Position of live cells
   IntVarArray q;
 
-  // Branching variants
-  enum{
-    BRANCH_AFC,
-    BRANCH_BORDERS,
-    BRANCH_SQUARES,
-    BRANCH_FULL_SQUARES
-  };
-  
+
   /// The actual problem
-  Life(const SizeOptions& opt)
-    : Script(opt){
-    int n = opt.size();
-    //c = IntVar(*this,1,(n/3)*(n/3)*6 + (n%3)*n*2 - (n%3)*(n%3));
+  Life(const SizeOptions& opt) : Script(opt) {
+
+    // init dimension related variables
+    dim = opt.size();
+    dimWithBorder = dim+4;
+    tailIdx = headIdx+dim-1;
+
     // number of squares of size 3*3
-    int squares = ceil(n/3.)*ceil(n/3.);
-    c = IntVar(*this,1,n*n);
+    int squares = ceil(dim/3.)*ceil(dim/3.);
+    c = IntVar(*this, 1, dim*dim);
     csquare = IntVarArray(*this, squares, 0, 6);
-    q = IntVarArray(*this,(n+4)*(n+4),0,1);
+    q = IntVarArray(*this, dimWithBorder*dimWithBorder,0,1);
 
-    Matrix<IntVarArray> m(q, n+4, n+4);
+    Matrix<IntVarArray> m(q, dimWithBorder, dimWithBorder);
 
-    //border
-    for (int i = 0; i<n+4; i++){
-      rel(*this, m(0,i) == 0);
-      rel(*this, m(1,i) == 0);
-      rel(*this, m(i,0) == 0);
-      rel(*this, m(i,1) == 0);
-      rel(*this, m(n+2,i) == 0);
-      rel(*this, m(n+3,i) == 0);
-      rel(*this, m(i,n+2) == 0);
-      rel(*this, m(i,n+3) == 0);
+    // outer border
+    for (int i=0; i<dimWithBorder; i++) {
+      rel(*this, m(0, i) == 0);
+      rel(*this, m(i, 0) == 0);
+      rel(*this, m(dimWithBorder-1, i) == 0);
+      rel(*this, m(i, dimWithBorder-1) == 0);
+    }
+
+    // inner border
+    for (int i=headIdx-1; i<=tailIdx+1; i++) {
+      rel(*this, m(headIdx-1, i) == 0);
+      rel(*this, m(i, headIdx-1) == 0);
+      rel(*this, m(i, tailIdx+1) == 0);
+      rel(*this, m(tailIdx+1, i) == 0);
     }
 
     // number of live cells
     int s = 0;
-    for (int i=2; i<n+2; i+=3){
-      for (int j=2; j<n+2; j+=3){
-        rel(*this, csquare[s] == sum(m.slice(i,i+3,j,j+3)));;
+    for (int i=headIdx; i<=tailIdx; i+=3){
+      for (int j=headIdx; j<=tailIdx; j+=3){
+        rel(*this, csquare[s] == sum(m.slice(i, i+3, j, j+3)));;
         s++;
       }
     }
     rel(*this, sum(csquare) == c);
     
-    //rel(*this, sum(m) == c);
-
-    //Still life
-    for (int i=1; i<=n+2; i++){
-      for (int j=1; j<=n+2; j++){
+    // apply constraints to the board and the inner border
+    for (int i=headIdx-1; i<=tailIdx+1; i++){
+      for (int j=headIdx-1; j<=tailIdx+1; j++){
         LinIntExpr around =
           m(i-1,j-1) + m(i,j-1) + m(i+1,j-1) +
           m(i-1,j) + m(i+1,j) +
           m(i-1,j+1) + m(i,j+1) + m(i+1,j+1);
+
+        // from the paper, both CP and IP are used
+        // the constraints below are the best subset of all constraints in the trick paper
         rel(*this, (m(i,j)==1) >> ((around == 2) || (around ==3)));
-        //rel(*this, (m(i,j)==1) >> (around >= 2));
-        //rel(*this, (m(i,j)==1) >> (around <= 3));
         rel(*this, (m(i,j)==0) >> (around != 3));
-        //rel(*this, 3*m(i,j)+around <= 6);
       }
     }
-
-    //Symetry breaking
-    //rel(*this, sum(m.slice(2,2+n/2,2,2+n))>=sum(m.slice(2+n-n/2,2+n,2,2+n)));
-    //rel(*this, sum(m.slice(2,2+n,2,2+n/2))>=sum(m.slice(2,2+n,2+n-n/2,2+n)));
 
     //Branching
     branch(*this, c, INT_VAL_MAX());
-    if (opt.branching() == BRANCH_AFC) {
+
+    // Based on experiments,
+    // AFC branching works best for dimensions that is not divisible by 3
+    // while SQUARE branching works best for those divisible by 3
+    if (dim%3 != 0) {
       branch(*this, q, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
-    } else if (opt.branching() == BRANCH_BORDERS) {
-      branch(*this, m.slice(2,n+2,2,3), INT_VAR_NONE(), INT_VAL_MAX());
-      branch(*this, m.slice(2,3,3,n+1), INT_VAR_NONE(), INT_VAL_MAX());
-      branch(*this, m.slice(n+1,n+2,3,n+1), INT_VAR_NONE(), INT_VAL_MAX());
-      branch(*this, m.slice(2,n+2,n+1,n+2), INT_VAR_NONE(), INT_VAL_MAX());
-      branch(*this, m.slice(3,n+1,3,n+1), INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
-    } else if (opt.branching() == BRANCH_SQUARES){
-      for (int i=2; i<n+2; i+=3){
-        for (int j=2; j<n+2; j+=3){
-          branch(*this, m.slice(i,i+3,j,j+3), INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
+    }
+    else {
+      for (int i=headIdx; i<=tailIdx; i+=3){
+        for (int j=headIdx; j<=tailIdx; j+=3){
+          branch(*this, m.slice(i,i+3,j,j+3),
+                 INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
         }
       }
     }
-    else if (opt.branching() == BRANCH_FULL_SQUARES){
-      int s=0;
-      for (int i=2; i<n+2; i+=3){
-        for (int j=2; j<n+2; j+=3){
-          branch(*this, csquare[s], INT_VAL_MAX());
-          branch(*this, m.slice(i,i+3,j,j+3), INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
-          s++;
-        }
-      }
-    }
-  }
+  } // end of Life Ctr
 
   /// Constructor for cloning \a s
-  Life(bool share, Life& s) : Script(share,s) {
-    q.update(*this, share, s.q);
-    c.update(*this, share, s.c);
+  Life(bool share, Life& life) : Script(share, life) {
+
+    dim = life.dim;
+    dimWithBorder = life.dimWithBorder;
+    headIdx = 2;
+    tailIdx = life.tailIdx;
+
+    q.update(*this, share, life.q);
+    c.update(*this, share, life.c);
   }
 
   /// Perform copying during cloning
@@ -257,18 +253,11 @@ public:
 /** \brief Main-function
  *  \relates Life
  */
-int
-main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   SizeOptions opt("Life");
   opt.iterations(500);
   opt.size(5);
 
-  opt.branching(Life::BRANCH_AFC);
-  opt.branching(Life::BRANCH_AFC, "afc", "afc");
-  opt.branching(Life::BRANCH_BORDERS, "borders", "borders first");
-  opt.branching(Life::BRANCH_SQUARES, "squares", "squares of size 3*3");
-  opt.branching(Life::BRANCH_FULL_SQUARES, "full", "full squares of size 3*3");
-  
 #if defined(GECODE_HAS_QT) && defined(GECODE_HAS_GIST)
   LifeInspector ki;
   opt.inspect.click(&ki);
@@ -278,5 +267,3 @@ main(int argc, char* argv[]) {
   Script::run<Life,DFS,SizeOptions>(opt);
   return 0;
 }
-
-// STATISTICS: example-any
