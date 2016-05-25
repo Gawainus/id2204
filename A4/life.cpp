@@ -116,7 +116,7 @@ public:
 
     // number of squares of size 3*3
     int squares = ceil(dim/3.)*ceil(dim/3.);
-    c = IntVar(*this, 1, dim*dim);
+    c = IntVar(*this, 0, dim*dim);
     // in each square of size 3*3, the number of live cells is limited by 6
     csquare = IntVarArray(*this, squares, 0, 6);
     q = IntVarArray(*this, dimWithBorder*dimWithBorder,0,1);
