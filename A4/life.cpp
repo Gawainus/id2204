@@ -61,41 +61,101 @@ class Life : public Script {
 public:
   /// Number of live cells
   IntVar c;
+  IntVarArray csquare;
   /// Position of live cells
   IntVarArray q;
+
+  // Branching variants
+  enum{
+    BRANCH_AFC,
+    BRANCH_BORDERS,
+    BRANCH_SQUARES,
+    BRANCH_FULL_SQUARES
+  };
+  
   /// The actual problem
   Life(const SizeOptions& opt)
     : Script(opt){
     int n = opt.size();
-    c = IntVar(*this,1,(n/3)*(n/3)*4 + (n%3)*n*2 - (n%3)*(n%3));
-    q = IntVarArray(*this,(n+2)*(n+2),0,1);
+    //c = IntVar(*this,1,(n/3)*(n/3)*6 + (n%3)*n*2 - (n%3)*(n%3));
+    // number of squares of size 3*3
+    int squares = ceil(n/3.)*ceil(n/3.);
+    c = IntVar(*this,1,n*n);
+    csquare = IntVarArray(*this, squares, 0, 6);
+    q = IntVarArray(*this,(n+4)*(n+4),0,1);
 
-    Matrix<IntVarArray> m(q, n+2, n+2);
+    Matrix<IntVarArray> m(q, n+4, n+4);
 
     //border
-    for (int i = 0; i<n+2; i++){
+    for (int i = 0; i<n+4; i++){
       rel(*this, m(0,i) == 0);
-      rel(*this, m(n+1,i) == 0);
+      rel(*this, m(1,i) == 0);
       rel(*this, m(i,0) == 0);
-      rel(*this, m(i,n+1) == 0);
+      rel(*this, m(i,1) == 0);
+      rel(*this, m(n+2,i) == 0);
+      rel(*this, m(n+3,i) == 0);
+      rel(*this, m(i,n+2) == 0);
+      rel(*this, m(i,n+3) == 0);
     }
 
     // number of live cells
-    rel(*this, sum(q) == c);
+    int s = 0;
+    for (int i=2; i<n+2; i+=3){
+      for (int j=2; j<n+2; j+=3){
+        rel(*this, csquare[s] == sum(m.slice(i,i+3,j,j+3)));;
+        s++;
+      }
+    }
+    rel(*this, sum(csquare) == c);
+    
+    //rel(*this, sum(m) == c);
 
-    //Stay alive
-    for (int i=1; i<=n; i++){
-      for (int j=1; j<=n; j++){
+    //Still life
+    for (int i=1; i<=n+2; i++){
+      for (int j=1; j<=n+2; j++){
         LinIntExpr around =
           m(i-1,j-1) + m(i,j-1) + m(i+1,j-1) +
           m(i-1,j) + m(i+1,j) +
           m(i-1,j+1) + m(i,j+1) + m(i+1,j+1);
         rel(*this, (m(i,j)==1) >> ((around == 2) || (around ==3)));
+        //rel(*this, (m(i,j)==1) >> (around >= 2));
+        //rel(*this, (m(i,j)==1) >> (around <= 3));
         rel(*this, (m(i,j)==0) >> (around != 3));
+        //rel(*this, 3*m(i,j)+around <= 6);
       }
     }
+
+    //Symetry breaking
+    //rel(*this, sum(m.slice(2,2+n/2,2,2+n))>=sum(m.slice(2+n-n/2,2+n,2,2+n)));
+    //rel(*this, sum(m.slice(2,2+n,2,2+n/2))>=sum(m.slice(2,2+n,2+n-n/2,2+n)));
+
+    //Branching
     branch(*this, c, INT_VAL_MAX());
-    branch(*this, q, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
+    if (opt.branching() == BRANCH_AFC) {
+      branch(*this, q, INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
+    } else if (opt.branching() == BRANCH_BORDERS) {
+      branch(*this, m.slice(2,n+2,2,3), INT_VAR_NONE(), INT_VAL_MAX());
+      branch(*this, m.slice(2,3,3,n+1), INT_VAR_NONE(), INT_VAL_MAX());
+      branch(*this, m.slice(n+1,n+2,3,n+1), INT_VAR_NONE(), INT_VAL_MAX());
+      branch(*this, m.slice(2,n+2,n+1,n+2), INT_VAR_NONE(), INT_VAL_MAX());
+      branch(*this, m.slice(3,n+1,3,n+1), INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
+    } else if (opt.branching() == BRANCH_SQUARES){
+      for (int i=2; i<n+2; i+=3){
+        for (int j=2; j<n+2; j+=3){
+          branch(*this, m.slice(i,i+3,j,j+3), INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
+        }
+      }
+    }
+    else if (opt.branching() == BRANCH_FULL_SQUARES){
+      int s=0;
+      for (int i=2; i<n+2; i+=3){
+        for (int j=2; j<n+2; j+=3){
+          branch(*this, csquare[s], INT_VAL_MAX());
+          branch(*this, m.slice(i,i+3,j,j+3), INT_VAR_AFC_MAX(opt.decay()), INT_VAL_MAX());
+          s++;
+        }
+      }
+    }
   }
 
   /// Constructor for cloning \a s
@@ -114,10 +174,10 @@ public:
   virtual void
   print(std::ostream& os) const {
     os << "Number of live cells: " << c << std::endl << std::endl;
-    int n = sqrt(q.size())-2;
-    for (int i = 1; i <= n; i++) {
-      for (int j = 1; j <= n; j++) {
-        os << q[i*(n+2)+j];
+    int n = sqrt(q.size())-4;
+    for (int i = 2; i <= n+1; i++) {
+      for (int j = 2; j <= n+1; j++) {
+        os << q[i*(n+4)+j];
       }
       os << std::endl;
     }
@@ -141,8 +201,8 @@ public:
   /// Inspect space \a s
   virtual void inspect(const Space& s) {
     const Life& q = static_cast<const Life&>(s);
-    const int n = sqrt(q.q.size())-2;
-    Matrix<IntVarArray> m(q.q, n+2, n+2);
+    const int n = sqrt(q.q.size());
+    Matrix<IntVarArray> m(q.q, n, n);
     
     if (!scene)
       initialize();
@@ -152,8 +212,8 @@ public:
       delete i;
     }
 
-    for (int i=1; i<=n; i++) {
-      for (int j=1; j<=n; j++) {
+    for (int i=0; i<n; i++) {
+      for (int j=0; j<n; j++) {
         scene->addRect(i*unit,j*unit,unit,unit);
         QBrush b(m(i,j).assigned() ? Qt::black : Qt::red);
         QPen p(m(i,j).assigned() ? Qt::black : Qt::white);
@@ -203,6 +263,12 @@ main(int argc, char* argv[]) {
   opt.iterations(500);
   opt.size(5);
 
+  opt.branching(Life::BRANCH_AFC);
+  opt.branching(Life::BRANCH_AFC, "afc", "afc");
+  opt.branching(Life::BRANCH_BORDERS, "borders", "borders first");
+  opt.branching(Life::BRANCH_SQUARES, "squares", "squares of size 3*3");
+  opt.branching(Life::BRANCH_FULL_SQUARES, "full", "full squares of size 3*3");
+  
 #if defined(GECODE_HAS_QT) && defined(GECODE_HAS_GIST)
   LifeInspector ki;
   opt.inspect.click(&ki);
@@ -214,4 +280,3 @@ main(int argc, char* argv[]) {
 }
 
 // STATISTICS: example-any
-
