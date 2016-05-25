@@ -169,11 +169,56 @@ public:
   /// Print solution
   virtual void
   print(std::ostream& os) const {
+    bool checks = true;
+    for (int i = headIdx; i <= tailIdx; i++) {
+      for (int j = headIdx; j <= tailIdx; j++) {
+        int sumOfNeibors =
+            q[(i-1)*(dimWithBorder)+j-1].val() +
+            q[(i-1)*(dimWithBorder)+j].val()+
+            q[(i-1)*(dimWithBorder)+j+1].val()+
+            q[i*(dimWithBorder)+j-1].val()+
+            q[i*(dimWithBorder)+j+1].val()+
+            q[(i+1)*(dimWithBorder)+j-1].val()+
+            q[(i+1)*(dimWithBorder)+j].val()+
+            q[(i+1)*(dimWithBorder)+j+1].val();
+
+        bool nonStillCond =
+            ((q[i*(dimWithBorder)+j].val() == 1) && (sumOfNeibors>3 || sumOfNeibors<2))
+            ||
+            ((q[i*(dimWithBorder)+j].val() == 0) && sumOfNeibors == 3);
+        if (nonStillCond) {
+          checks = false;
+          os << "Cell (" << i-1 << ", " << j-1 << ") " << "is not still." << std::endl;
+        }
+      }
+    }
+    if (checks) {
+      os << "The solution checks." << std::endl
+      << "Every live cell has 2 or 3 neighbors." << std::endl
+      << "Every dead cell has no 3 neighbors." << std::endl;
+
+    }
+    else {
+      os << "The Board is not still!" << std:: endl;
+    }
     os << "Number of live cells: " << c << std::endl << std::endl;
-    int n = sqrt(q.size())-4;
-    for (int i = 2; i <= n+1; i++) {
-      for (int j = 2; j <= n+1; j++) {
-        os << q[i*(n+4)+j];
+    for (int i = 0; i < dimWithBorder; i++) {
+      for (int j = 0; j < dimWithBorder; j++) {
+        int cell = q[i*(dimWithBorder)+j].val();
+        if (i == 0 || i == 1 || i==dimWithBorder-1 || i== tailIdx+1) {
+          os << "~";
+        }
+        else if (j ==0 || j ==1 || j == dimWithBorder-1 || j == tailIdx+1) {
+          os << "|";
+        }
+        else if (cell == 1) {
+          os << "O";
+
+        }
+        else {
+          os << " ";
+
+        }
       }
       os << std::endl;
     }
