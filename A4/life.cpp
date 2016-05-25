@@ -88,16 +88,16 @@ public:
     // outer border
     for (int i = 0; i<dimWithBorder; i++){
       rel(*this, m(0,i) == 0);
-      rel(*this, m(tailIdx+2, i) == 0);
       rel(*this, m(i, 0) == 0);
+      rel(*this, m(tailIdx+2, i) == 0);
       rel(*this, m(i, tailIdx+2) == 0);
     }
 
     // inner
     for (int i = 1; i<dimWithBorder-1; i++){
       rel(*this, m(1, i) == 0);
-      rel(*this, m(tailIdx+1, i) == 0);
       rel(*this, m(i, 1) == 0);
+      rel(*this, m(tailIdx+1, i) == 0);
       rel(*this, m(i, tailIdx+1) == 0);
     }
 
@@ -112,8 +112,15 @@ public:
             m(i-1,j) + m(i+1,j) +
             m(i-1,j+1) + m(i,j+1) + m(i+1,j+1);
 
-        rel(*this, (m(i,j)==1) >> ((around == 2) || (around ==3)));
+        // CP
+        // this equality constraint seems to be very slow
+        // rel(*this, (m(i,j)==1) >> ((around == 2) || (around == 3)));
         rel(*this, (m(i,j)==0) >> (around != 3));
+
+        // IP
+        rel(*this, (m(i,j)==1) >> (around <= 3));
+        rel(*this, (m(i,j)==1) >> (around >= 2));
+        // rel(*this, (m(i,j)==0) >> (around <= 6));
       }
     }
 
@@ -152,6 +159,7 @@ public:
                 q[(i+1)*(dimWithBorder)+j-1].val()+
                 q[(i+1)*(dimWithBorder)+j].val()+
                 q[(i+1)*(dimWithBorder)+j+1].val();
+
         bool nonStillCond =
             ((q[i*(dimWithBorder)+j].val() == 1) && sumOfNeibors>3 || sumOfNeibors<2)
                             ||
