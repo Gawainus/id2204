@@ -34,6 +34,14 @@ using namespace Gecode::Int;
 
 /*
  * Custom brancher for forcing mandatory parts
+ * 
+ * The brancher has been tried with several parameters for the
+ * "square" problem.
+ * The best results were obtained with percentage p=0.2 and the
+ * "split" branching option described in the paper, which first
+ * splits the interval of all x[i] and y[i] variables, and then
+ * assigns values to all x[i] and y[i].
+
  *
  */
 class IntervalBrancher : public Brancher {
@@ -47,14 +55,13 @@ protected:
   // Cache of first unassigned view
   mutable int start;
 
-  /*
-   *
-   */
-  // max number of values in the new intervals
+  // compute the maximum size (x.max-x.min) of the new intervals
   int interval_size(int pos) const{
     return floor((1-p)*w[pos]);
   }
 
+  // compute the number of alternatives in the branching
+  // (one for each interval)
   int alternatives(int old_interval_size, int new_interval_size){
     return ceil(((double)old_interval_size+1)/(new_interval_size+1));
   }
@@ -67,7 +74,9 @@ protected:
     // You might need more information, please add here
 
     /* Initialize description for brancher b, number of
-     *  alternatives a, position p, and ???.
+     *  alternatives a, position p, and 
+     * the minimum and maximum values for the variable
+     * BEFORE doing the branching
      */
     int min;
     int max;
@@ -115,7 +124,10 @@ public:
   // Check status of brancher, return true if alternatives left
   virtual bool status(const Space& home) const {
 
-    // FILL IN HERE
+    // Branching if and only if:
+    // the square is big enough (typically w >= 5) AND
+    // the current size of the interval of values for the variable is
+    // larger than the size needed to achieve "obligatory parts"
     for (int i=0; i<x.size(); i++){
       if (w[i]>=5 && (x[i].max() - x[i].min() > interval_size(i)))
 	return true;
@@ -126,7 +138,8 @@ public:
   // Return choice as description
   virtual const Choice* choice(Space& home) {
 
-    // FILL IN HERE
+    // if there is a new branching to do, initialize it with the number
+    // of alternatives, position, and initial min and max values
     for (int i=0; true; i++)
       if (w[i]>=5 && (x[i].max() - x[i].min() > interval_size(i))){
 	int alt = alternatives(x[i].max()-x[i].min(), interval_size(i));
@@ -141,8 +154,12 @@ public:
     // Again, you have to take care of the additional information
     int pos, min, max;
     e >> pos >> min >> max;
+
+    // We use the values of min and max here in order to compute the
+    // number of alternatives
     return new Description(*this, pos,
-                           alternatives(max-min, interval_size(pos)), min, max);
+                           alternatives(max-min, interval_size(pos)),
+			   min, max);
   }
   // Perform commit for choice c and alternative a
   virtual ExecStatus commit(Space& home, 
@@ -150,7 +167,10 @@ public:
                             unsigned int a) {
     const Description& d = static_cast<const Description&>(c);
 
-    // FILL IN HERE
+    // The new minimum and maximum values for the variable are computed
+    // depending on the alternative a
+    // new_min >= old_min + a*size
+    // new max < old_min + (a+1)*size
     int pos = d.pos, min = d.min;
     if (!me_failed(x[pos].gq(home, (int)(min+a*(interval_size(pos)+1)))) &&
 	!me_failed(x[pos].le(home, (int)(min+(a+1)*(interval_size(pos)+1)))) )
@@ -166,7 +186,8 @@ public:
   virtual void print(const Space& home, const Choice& c, unsigned int b,
                      std::ostream& o) const {
 
-    // FILL IN HERE
+    // Compute the new borders of the interval for the variable
+    // and print it
     const Description& d = static_cast<const Description&>(c);
     int pos = d.pos, min = d.min, max = d.max;
     int size = interval_size(pos);
